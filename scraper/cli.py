@@ -5,6 +5,7 @@ from rich.table import Table
 from rich import box
 
 from scraper import ebay
+from scraper.filters import apply_filters
 
 app = typer.Typer(help="eBay sold listings scraper.")
 console = Console()
@@ -32,6 +33,8 @@ def search(
             console.print(f"[red]Error:[/red] {e}")
             raise typer.Exit(1)
 
+    listings, graded_removed, parallel_removed = apply_filters(listings)
+
     if filter:
         listings = [l for l in listings if filter.lower() in l.title.lower()]
         console.print(f"[dim]Filtered to titles containing:[/dim] [cyan]{filter}[/cyan]\n")
@@ -56,11 +59,13 @@ def search(
 
     console.print(table)
     console.print(f"[dim]{len(listings)} result(s) returned[/dim]")
+    console.print(f"[dim]{graded_removed} graded cards removed[/dim]")
+    console.print(f"[dim]{parallel_removed} parallel cards removed[/dim]")
 
     if debug:
         with open("debug.html", "w", encoding="utf-8") as f:
             f.write(raw_html)
         serials = {m.group() for l in listings for m in re.finditer(r'#[A-Za-z0-9\-]+', l.title)}
         console.print(f"[dim]Raw HTML written to debug.html[/dim]")
-        console.print(f"[dim]{len(serials)} unique serial(s) found[/dim]")
+        console.print(f"[dim]{len(serials)} unique serials left after filtering[/dim]")
     console.print()
