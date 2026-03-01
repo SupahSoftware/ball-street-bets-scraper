@@ -1,3 +1,4 @@
+import re
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -18,6 +19,7 @@ def main():
 def search(
     query: str = typer.Argument(..., help="Search term, e.g. 'rtx 4090'"),
     limit: int = typer.Option(20, "--limit", "-l", help="Max number of results to return"),
+    filter: str = typer.Option(None, "--filter", "-f", help="Only show listings whose title contains this string (case-insensitive)"),
     debug: bool = typer.Option(False, "--debug", help="Dump raw HTML to debug.html for inspection"),
 ):
     """Search eBay sold listings and display results."""
@@ -30,10 +32,9 @@ def search(
             console.print(f"[red]Error:[/red] {e}")
             raise typer.Exit(1)
 
-    if debug:
-        with open("debug.html", "w", encoding="utf-8") as f:
-            f.write(raw_html)
-        console.print("[dim]Raw HTML written to debug.html[/dim]\n")
+    if filter:
+        listings = [l for l in listings if filter.lower() in l.title.lower()]
+        console.print(f"[dim]Filtered to titles containing:[/dim] [cyan]{filter}[/cyan]\n")
 
     if not listings:
         console.print("[yellow]No sold listings found.[/yellow]")
@@ -54,4 +55,12 @@ def search(
         )
 
     console.print(table)
-    console.print(f"[dim]{len(listings)} result(s) returned[/dim]\n")
+    console.print(f"[dim]{len(listings)} result(s) returned[/dim]")
+
+    if debug:
+        with open("debug.html", "w", encoding="utf-8") as f:
+            f.write(raw_html)
+        serials = {m.group() for l in listings for m in re.finditer(r'#[A-Za-z0-9\-]+', l.title)}
+        console.print(f"[dim]Raw HTML written to debug.html[/dim]")
+        console.print(f"[dim]{len(serials)} unique serial(s) found[/dim]")
+    console.print()

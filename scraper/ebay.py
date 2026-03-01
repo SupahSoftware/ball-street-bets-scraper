@@ -2,6 +2,7 @@ import re
 from bs4 import BeautifulSoup
 from dataclasses import dataclass
 from typing import Optional
+from urllib.parse import quote_plus
 
 from playwright.sync_api import sync_playwright
 from playwright_stealth import Stealth
@@ -17,9 +18,7 @@ class SoldListing:
 
 def build_search_url(query: str, limit: int = 50) -> str:
     params = {
-        "_nkw": query.replace(" ", "+"),
-        "LH_Sold": "1",
-        "LH_Complete": "1",
+        "_nkw": quote_plus(query),
         "_ipg": str(min(limit, 240)),  # eBay max per page is 240
     }
     query_string = "&".join(f"{k}={v}" for k, v in params.items())
@@ -73,7 +72,10 @@ def parse_listings(html: str) -> list[SoldListing]:
         sold_price = parse_price(raw_price)
 
         date_el = item.select_one("[aria-label='Sold Item']")
-        sold_date = date_el.get_text(strip=True).replace("Sold", "").strip() if date_el else None
+        sold_date = None
+        if date_el:
+            m = re.search(r"((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4})", date_el.get_text(" ", strip=True))
+            sold_date = m.group(1) if m else None
 
         listings.append(
             SoldListing(
@@ -101,11 +103,29 @@ def search(query: str, limit: int = 50) -> tuple[list[SoldListing], str]:
 
         page.goto(url, wait_until="domcontentloaded", timeout=30000)
 
-        # Listings load dynamically — wait for cards to appear
+        # Click the "Sold Items" checkbox to filter naturally (URL params get stripped by eBay)
         try:
+            sold_checkbox = page.locator("text=Sold Items").first
+            sold_checkbox.click(timeout=8000)
             page.wait_for_selector(".s-card__title", timeout=15000)
         except Exception:
             pass  # Let debug mode reveal what loaded if selectors are wrong
+
+        # Re-navigate with Best Match sort + explicit page size so results span the
+        # full 90-day window instead of defaulting to most-recently-sold (today only)
+        current_url = page.url
+        if "LH_Sold" in current_url:
+            sep = "&" if "?" in current_url else "?"
+            if "_sop=" not in current_url:
+                current_url += f"{sep}_sop=1"
+                sep = "&"
+            if "_ipg=" not in current_url:
+                current_url += f"{sep}_ipg={min(limit, 240)}"
+            page.goto(current_url, wait_until="domcontentloaded", timeout=30000)
+            try:
+                page.wait_for_selector(".s-card__title", timeout=15000)
+            except Exception:
+                pass
 
         html = page.content()
         browser.close()
