@@ -1,3 +1,4 @@
+import csv
 import re
 import typer
 from rich.console import Console
@@ -33,7 +34,7 @@ def search(
             console.print(f"[red]Error:[/red] {e}")
             raise typer.Exit(1)
 
-    listings, graded_removed, parallel_removed = apply_filters(listings)
+    listings, graded_removed, parallel_removed, no_serial_removed = apply_filters(listings, query)
 
     if filter:
         listings = [l for l in listings if filter.lower() in l.title.lower()]
@@ -61,11 +62,17 @@ def search(
     console.print(f"[dim]{len(listings)} result(s) returned[/dim]")
     console.print(f"[dim]{graded_removed} graded cards removed[/dim]")
     console.print(f"[dim]{parallel_removed} parallel cards removed[/dim]")
+    console.print(f"[dim]{no_serial_removed} removed (no card number found)[/dim]")
 
     if debug:
         with open("debug.html", "w", encoding="utf-8") as f:
             f.write(raw_html)
-        serials = {m.group() for l in listings for m in re.finditer(r'#[A-Za-z0-9\-]+', l.title)}
+        with open("table_debug.csv", "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["#", "Card Number", "Title", "Sold Price", "Sold Date", "URL"])
+            for i, listing in enumerate(listings, start=1):
+                price = f"${listing.sold_price:,.2f}" if listing.sold_price else ""
+                writer.writerow([i, listing.card_number or "", listing.title, price, listing.sold_date or "", listing.url])
         console.print(f"[dim]Raw HTML written to debug.html[/dim]")
-        console.print(f"[dim]{len(serials)} unique serials left after filtering[/dim]")
+        console.print(f"[dim]Table written to table_debug.csv[/dim]")
     console.print()

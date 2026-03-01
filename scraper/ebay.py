@@ -14,6 +14,7 @@ class SoldListing:
     sold_price: Optional[float]
     sold_date: Optional[str]
     url: str
+    card_number: Optional[str] = None
 
 
 def build_search_url(query: str, limit: int = 50) -> str:
