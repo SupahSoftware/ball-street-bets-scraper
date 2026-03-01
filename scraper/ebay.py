@@ -38,6 +38,20 @@ def parse_price(text: str) -> Optional[float]:
     return None
 
 
+_TITLE_JUNK = re.compile(
+    r"^New Listing"             # leading badge
+    r"|Opens in a new window or tab$"  # trailing link text
+    r"|\$[\d,]+\.?\d*"         # embedded price
+    r"|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4}\b",  # embedded date
+    re.IGNORECASE,
+)
+
+
+def _clean_title(raw: str) -> str:
+    title = _TITLE_JUNK.sub("", raw)
+    return " ".join(title.split())
+
+
 def parse_listings(html: str) -> list[SoldListing]:
     soup = BeautifulSoup(html, "lxml")
     items = soup.select(".s-card")
@@ -47,7 +61,7 @@ def parse_listings(html: str) -> list[SoldListing]:
         title_el = item.select_one(".s-card__title")
         if not title_el:
             continue
-        title = title_el.get_text(strip=True)
+        title = _clean_title(title_el.get_text(strip=True))
         if not title:
             continue
 
