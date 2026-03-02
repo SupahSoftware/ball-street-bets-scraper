@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: bsb
+      POSTGRES_PASSWORD: bsb
+      POSTGRES_DB: ballstreetbets
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bsb -d ballstreetbets"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  scraper:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://bsb:bsb@postgres:5432/ballstreetbets
+    restart: unless-stopped
+
+volumes:
+  pgdata:

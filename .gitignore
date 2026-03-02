@@ -1,3 +1,9 @@
 .claude/**
 scraper/__pycache__/**
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
 debug.html
+table_debug.csv
